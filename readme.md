@@ -1,5 +1,49 @@
 # Setting Up a WebSocket Server Using `socket.io` (Singleton Approach)
 
+## Explanation of io and socket in Easy Language
+
+### 1️⃣ What is io?
+`io` is the WebSocket server itself. It manages all client connections and allows broadcasting messages to all connected users.
+
+Think of `io` as a chat room manager who handles all users joining, leaving, and sending messages.
+When a new client connects, `io` detects it and gives them a unique socket (ID).
+
+#### Example:
+```ts
+this.io.on("connection", (socket) => { 
+  // Handle new connection
+});
+```
+
+This means:
+👉 "When someone joins (connects), give them a socket to communicate."
+
+---
+
+### 2️⃣ What is socket?
+`socket` represents a single connected user. It allows us to send/receive messages between that specific user and the server.
+
+Every time a user connects, `io` assigns them a socket.
+This socket is unique to that user, like a personal walkie-talkie.
+
+#### Example:
+```ts
+socket.on("message", (data) => {
+  console.log("Received message:", data);
+  socket.broadcast.emit("message", data);
+});
+```
+
+This means:
+👉 "When this specific user sends a message, share it with all other users except them."
+
+---
+
+### 📌 Summary
+- **`io` (WebSocket Server):** Manages all clients.
+- **`socket` (Single Connection):** Represents one specific user.
+`
+
 ### **Steps:**
 1. Install dependencies: `npm install express socket.io`
 2. Create a singleton `WebSocketServer` class.
@@ -55,7 +99,7 @@ class WebSocketServer {
 
       socket.on("message", (data) => {
         console.log("Received message:", data);
-        socket.broadcast.emit("message", data); // Broadcast to all clients
+        socket.broadcast.emit("message", data); // Broadcast to all clients, except self
       });
 
       socket.on("disconnect", () => {
