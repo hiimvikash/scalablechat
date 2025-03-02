@@ -170,3 +170,105 @@ socket.on("message", (data) => {
 3. **Allows easy access via `getInstance()`** from other parts of the app.
 
 This approach keeps WebSocket handling **modular**, **scalable**, and **maintainable**. 🚀
+
+# Setup client-side.
+
+## `SocketProvider.tsx`
+
+```ts
+"use client";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { io, Socket } from "socket.io-client";
+
+interface SocketProviderProps {
+  children?: React.ReactNode;
+}
+
+interface ISocketContext {
+  sendMessage: (msg: string) => void;
+  messages: string[];
+  socketId: string | null;
+}
+
+const SocketContext = React.createContext<ISocketContext | null>(null);
+
+export const useSocket = () => {
+  const state = useContext(SocketContext);
+  if (!state) throw new Error("SocketContext is undefined");
+
+  return state;
+};
+
+export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [messages, setMessages] = useState<string[]>([]);
+  const [socketId, setSocketId] = useState<string | null>(null);
+
+  // Function to send message
+  const sendMessage: ISocketContext["sendMessage"] = useCallback(
+    (msg) => {
+      console.log("Sending message:", msg);
+      if (socket) {
+        socket.emit("message", msg);
+      }
+    },
+    [socket]
+  );
+
+  // Function to handle incoming messages
+  const onMessageReceived = useCallback((msg: string) => {
+    console.log("Received from server:", msg);
+    setMessages((prev) => [...prev, msg]);
+  }, []);
+
+  useEffect(() => {
+    // Connect to the WebSocket server
+    const _socket = io("http://localhost:8000");
+
+    _socket.on("connect", () => {
+      console.log("Connected with socket ID:", _socket.id);
+      setSocketId(_socket.id);
+    });
+
+    _socket.on("message", onMessageReceived);
+
+    setSocket(_socket);
+
+    return () => {
+      _socket.off("message", onMessageReceived);
+      _socket.disconnect();
+      setSocket(null);
+      setSocketId(null);
+    };
+  }, []);
+
+  return (
+    <SocketContext.Provider value={{ sendMessage, messages, socketId }}>
+      {children}
+    </SocketContext.Provider>
+  );
+};
+```
+## How to use in any component
+
+```ts
+import { useSocket } from "./SocketProvider";
+
+const ChatComponent = () => {
+  const { sendMessage, messages, socketId } = useSocket();
+
+  return (
+    <div>
+      <h2>Socket ID: {socketId}</h2>
+      <button onClick={() => sendMessage("Hello Server!")}>Send</button>
+      <ul>
+        {messages.map((msg, idx) => (
+          <li key={idx}>{msg}</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default ChatComponent;
+```
