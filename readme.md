@@ -276,7 +276,7 @@ export default ChatComponent;
 # FLOW WHEN WE USE PUB-SUB ARCHITECTURE
   ![image](https://github.com/user-attachments/assets/34e55437-d36e-4c2d-9005-d0999eaa254d)
 
-# Final `WebSocketServer.ts` implementation with PubSub
+## Final `WebSocketServer.ts` implementation with PubSub
 
 ```ts
 import { Server as HttpServer } from "http";
