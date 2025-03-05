@@ -276,3 +276,83 @@ export default ChatComponent;
 # FLOW WHEN WE USE PUB-SUB ARCHITECTURE
   ![image](https://github.com/user-attachments/assets/34e55437-d36e-4c2d-9005-d0999eaa254d)
 
+# Final `WebSocketServer.ts` implementation with PubSub
+
+```ts
+import { Server as HttpServer } from "http";
+import { Server as SocketIOServer, Socket } from "socket.io";
+import Redis from "ioredis";
+
+const pub = new Redis({
+  host: "",
+  port: 0,
+  username: "default",
+  password: "",
+});
+
+const sub = new Redis({
+  host: "",
+  port: 0,
+  username: "",
+  password: "",
+});
+
+class WebSocketServer {
+  private static instance: WebSocketServer;
+  private io: SocketIOServer;
+
+  private constructor(server: HttpServer) {
+    this.io = new SocketIOServer(server, {
+      cors: {
+        origin: "*", // Adjust based on your needs
+      },
+    });
+
+    this.setupListeners();
+    sub.subscribe("MESSAGES");
+  }
+
+  public static initialize(server: HttpServer): WebSocketServer {
+    if (!WebSocketServer.instance) {
+      WebSocketServer.instance = new WebSocketServer(server);
+    }
+    return WebSocketServer.instance;
+  }
+
+  public static getInstance(): WebSocketServer {
+    if (!WebSocketServer.instance) {
+      throw new Error("WebSocketServer not initialized. Call initialize(server) first.");
+    }
+    return WebSocketServer.instance;
+  }
+
+  private setupListeners() {
+    this.io.on("connection", (socket: Socket) => {
+      console.log(`Client connected: ${socket.id}`);
+
+      socket.on("event:message", ({message} : {message: string}) => {
+        console.log("Received message:", message);
+        await pub.publish("MESSAGES", JSON.stringify({ message }));
+      });
+
+      sub.on("message", async (channel, message) => {
+      if (channel === "MESSAGES") {
+        console.log("new message from redis", message);
+        io.emit("message", message);
+      }
+    });
+
+      socket.on("disconnect", () => {
+        console.log(`Client disconnected: ${socket.id}`);
+      });
+    });
+  }
+
+  public getIO(): SocketIOServer {
+    return this.io;
+  }
+}
+
+export default WebSocketServer;
+```
+
