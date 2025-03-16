@@ -97,8 +97,9 @@ class WebSocketServer {
     this.io.on("connection", (socket: Socket) => {
       console.log(`Client connected: ${socket.id}`);
 
-      socket.on("message", (data) => {
+      socket.on("event:message", (data) => { // SERVER listens when user/client clicks "SEND" button
         console.log("Received message:", data);
+        // publish to pubsub
         socket.broadcast.emit("message", data); // Broadcast to all clients, except self
       });
 
@@ -155,9 +156,9 @@ socket.on("connect", () => {
   console.log("Connected to WebSocket Server");
 });
 
-socket.emit("message", "Hello from client!");
+socket.emit("message:event", "Hello from client!");
 
-socket.on("message", (data) => {
+socket.on("message", (data) => { // this is listening to the events emited by server
   console.log("Received:", data);
 });
 ```
@@ -171,7 +172,9 @@ socket.on("message", (data) => {
 
 This approach keeps WebSocket handling **modular**, **scalable**, and **maintainable**. 🚀
 
-# Setup client-side.
+---
+
+# FINAL APP RELATED CODES
 
 ## `SocketProvider.tsx`
 
@@ -209,7 +212,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     (msg) => {
       console.log("Sending message:", msg);
       if (socket) {
-        socket.emit("message", msg);
+        socket.emit("message:event", msg);
       }
     },
     [socket]
@@ -230,7 +233,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setSocketId(_socket.id);
     });
 
-    _socket.on("message", onMessageReceived);
+    _socket.on("message:rec", onMessageReceived);
 
     setSocket(_socket);
 
@@ -276,7 +279,7 @@ export default ChatComponent;
 # FLOW WHEN WE USE PUB-SUB ARCHITECTURE
   ![image](https://github.com/user-attachments/assets/34e55437-d36e-4c2d-9005-d0999eaa254d)
 
-## Final `WebSocketServer.ts` implementation with PubSub
+## Final `WebSocketServer.ts` implementation with PubSub.
 
 ```ts
 import { Server as HttpServer } from "http";
@@ -338,7 +341,7 @@ class WebSocketServer {
       sub.on("message", async (channel, message) => {
       if (channel === "MESSAGES") {
         console.log("new message from redis", message);
-        io.emit("message", message);
+        io.emit("message:rec", message);
       }
     });
 
