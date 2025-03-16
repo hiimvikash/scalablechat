@@ -175,6 +175,8 @@ This approach keeps WebSocket handling **modular**, **scalable**, and **maintain
 ---
 
 # FINAL APP RELATED CODES
+![image](https://github.com/user-attachments/assets/4f353341-4a0e-456f-b0f4-65f2bef773a6)
+
 
 ## `SocketProvider.tsx`
 
@@ -275,9 +277,6 @@ const ChatComponent = () => {
 
 export default ChatComponent;
 ```
-
-# FLOW WHEN WE USE PUB-SUB ARCHITECTURE
-  ![image](https://github.com/user-attachments/assets/34e55437-d36e-4c2d-9005-d0999eaa254d)
 
 ## Final `WebSocketServer.ts` implementation with PubSub.
 
