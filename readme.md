@@ -487,5 +487,7 @@ export async function startMessageConsumer() {
   });
 }
 ```
+![image](https://github.com/user-attachments/assets/5b556fa4-4491-4c21-933d-9ad018eab86a)
+
 
 
