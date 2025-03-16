@@ -221,9 +221,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   );
 
   // Function to handle incoming messages
-  const onMessageReceived = useCallback((msg: string) => {
-    console.log("Received from server:", msg);
-    setMessages((prev) => [...prev, msg]);
+  const onMessageReceived = useCallback((data: {message : string}) => {
+    console.log("Received from server:", data);
+    setMessages((prev) => [...prev, data.message]);
   }, []);
 
   useEffect(() => {
@@ -338,11 +338,12 @@ class WebSocketServer {
       });
 
       sub.on("message", async (channel, message) => {
-      if (channel === "MESSAGES") {
-        console.log("new message from redis", message);
-        io.emit("message:rec", message);
-      }
-    });
+        if (channel === "MESSAGES") {
+            console.log("new message from redis", message);
+            const parsedMessage = JSON.parse(message);  // Convert string to object
+            io.emit("message:rec", parsedMessage);
+        }
+      });
 
       socket.on("disconnect", () => {
         console.log(`Client disconnected: ${socket.id}`);
