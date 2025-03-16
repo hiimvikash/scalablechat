@@ -1,4 +1,4 @@
-# Setting Up a WebSocket Server Using `socket.io` (Singleton Approach)
+# 1. Understanding WebSocket Server Using `socket.io` (Singleton Approach)
 
 ## Explanation of io and socket in Easy Language
 
@@ -174,7 +174,7 @@ This approach keeps WebSocket handling **modular**, **scalable**, and **maintain
 
 ---
 
-# FINAL APP RELATED CODES
+# 2. Integrating PUBSUB 
 ![image](https://github.com/user-attachments/assets/4f353341-4a0e-456f-b0f4-65f2bef773a6)
 
 
@@ -335,6 +335,7 @@ class WebSocketServer {
       socket.on("event:message", ({message} : {message: string}) => {
         console.log("Received message:", message);
         await pub.publish("MESSAGES", JSON.stringify({ message }));
+        await produceMessage(message); // producing in kafka (ignore for now)
       });
 
       sub.on("message", async (channel, message) => {
@@ -358,4 +359,133 @@ class WebSocketServer {
 
 export default WebSocketServer;
 ```
+
+# 3. Integrate Kafka and DB 
+
+- GET postgress connection string from neonDB.
+- Setup Prisma in your Project.
+- Write `schema.prisma` and run `npx prisma migrate dev --name init && npx prisma generate`
+- GET kafka URL.
+- `npm i kafkajs`
+- `kafka.ts` : HERE WE ARE 
+```ts
+import { Kafka, Producer } from "kafkajs";
+import fs from "fs";
+import path from "path";
+import prismaClient from "./prisma";
+
+const kafka = new Kafka({
+  brokers: [""],
+  ssl: {
+    ca: [fs.readFileSync(path.resolve("./ca.pem"), "utf-8")],
+  },
+  sasl: {
+    username: "",
+    password: "",
+    mechanism: "",
+  },
+});
+
+let producer: null | Producer = null;
+
+export async function createProducer() {
+  if (producer) return producer;
+
+  const _producer = kafka.producer();
+  await _producer.connect();
+  producer = _producer;
+  return producer;
+}
+
+export async function produceMessage(message: string) { // USE THIS WHILE PUBLISHING TO PUBSUB
+  const producer = await createProducer();
+  await producer.send({
+    messages: [{ key: `message-${Date.now()}`, value: message }],
+    topic: "MESSAGES",
+  });
+  return true;
+}
+
+export async function startMessageConsumer() { // RUN THIS FUNCTION AT INDEX.JS
+  console.log("Consumer is running..");
+  const consumer = kafka.consumer({ groupId: "default" });
+  await consumer.connect();
+  await consumer.subscribe({ topic: "MESSAGES", fromBeginning: true });
+
+  await consumer.run({
+    autoCommit: true,
+    eachMessage: async ({ message, pause }) => {
+      if (!message.value) return;
+      console.log(`New Message Recv..`);
+      try {
+        await prismaClient.message.create({
+          data: {
+            text: message.value?.toString(),
+          },
+        });
+      } catch (err) {
+        console.log("Something is wrong");
+        pause();
+        setTimeout(() => {
+          consumer.resume([{ topic: "MESSAGES" }]);
+        }, 60 * 1000);
+      }
+    },
+  });
+}
+export default kafka;
+```
+## Optimized Batch Insert Approach
+- Modify your consumer to collect messages in an array and insert them in bulk:
+
+```ts
+export async function startMessageConsumer() {
+  console.log("Consumer is running..");
+  const consumer = kafka.consumer({ groupId: "default" });
+  await consumer.connect();
+  await consumer.subscribe({ topic: "MESSAGES", fromBeginning: true });
+
+  let messagesBuffer: { text: string }[] = [];
+  const BATCH_SIZE = 10; // Number of messages before inserting into DB
+  const BATCH_INTERVAL = 5000; // 5 seconds
+
+  setInterval(async () => {
+    if (messagesBuffer.length > 0) {
+      try {
+        console.log(`Inserting ${messagesBuffer.length} messages into DB..`);
+        await prismaClient.message.createMany({
+          data: messagesBuffer,
+          skipDuplicates: true, // Avoid duplicate inserts
+        });
+        messagesBuffer = []; // Clear buffer after insert
+      } catch (err) {
+        console.error("DB Insert Error", err);
+      }
+    }
+  }, BATCH_INTERVAL);
+
+  await consumer.run({
+    autoCommit: true,
+    eachMessage: async ({ message }) => {
+      if (!message.value) return;
+      console.log(`Buffered message: ${message.value.toString()}`);
+      messagesBuffer.push({ text: message.value.toString() });
+
+      if (messagesBuffer.length >= BATCH_SIZE) {
+        try {
+          console.log(`Inserting ${BATCH_SIZE} messages into DB..`);
+          await prismaClient.message.createMany({
+            data: messagesBuffer,
+            skipDuplicates: true,
+          });
+          messagesBuffer = [];
+        } catch (err) {
+          console.error("DB Insert Error", err);
+        }
+      }
+    },
+  });
+}
+```
+
 
